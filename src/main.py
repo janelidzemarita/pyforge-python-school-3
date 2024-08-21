@@ -1,4 +1,5 @@
 from os import getenv
+from typing import List
 
 from rdkit import Chem
 from fastapi import FastAPI, HTTPException
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 
 app = FastAPI(
     title="Molecule Management API",
-    version="1.1.0"
+    version="1.1.1"
 )
 
 # Data structure to store molecules
@@ -18,6 +19,10 @@ class Molecule(BaseModel):
     smiles: str
 
 
+class SubstructureQuery(BaseModel):
+    substructure: str
+
+
 def substructure_search(mols, mol):
     """
     :param mols: list of molecules
@@ -25,8 +30,11 @@ def substructure_search(mols, mol):
     :return: matching molecules
     """
     # List to store molecules that contain the substructure (mol)
-    matching_molecules = [smiles for smiles in mols if
-                          Chem.MolFromSmiles(smiles).HasSubstructMatch(Chem.MolFromSmiles(mol))]
+    molecule = Chem.MolFromSmiles(mol)
+    matching_molecules = [
+        smiles for smiles in mols if
+        Chem.MolFromSmiles(smiles).HasSubstructMatch(molecule)
+    ]
     return matching_molecules
 
 
@@ -47,11 +55,19 @@ async def add_molecule(molecule: Molecule):
     - **smiles**: SMILES representation of the molecule.
     """
     if molecule.identifier in molecules:
-        raise HTTPException(status_code=400, detail="Molecule with this identifier already exists.")
+        raise HTTPException(
+            status_code=400,
+            detail="Molecule with this identifier already exists."
+        )
     try:
-        mol = Chem.MolFromSmiles(molecule.smiles)
+        mol = Chem.MolFromSmiles(
+            molecule.smiles
+        )
         if mol is None:
-            raise HTTPException(status_code=400, detail="Invalid SMILES string.")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SMILES string."
+            )
         molecules[molecule.identifier] = molecule.smiles
         return {"message": "Molecule added successfully."}
     except Exception as e:
@@ -66,7 +82,10 @@ async def get_molecule(identifier: str):
     - **identifier**: Unique identifier of the molecule.
     """
     if identifier not in molecules:
-        raise HTTPException(status_code=404, detail="Molecule not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Molecule not found."
+        )
     return {"identifier": identifier, "smiles": molecules[identifier]}
 
 
@@ -83,7 +102,10 @@ async def update_molecule(identifier: str, molecule: Molecule):
     try:
         mol = Chem.MolFromSmiles(molecule.smiles)
         if mol is None:
-            raise HTTPException(status_code=400, detail="Invalid SMILES string.")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid SMILES string."
+            )
         molecules[identifier] = molecule.smiles
         return {"message": "Molecule updated successfully."}
     except Exception as e:
@@ -98,7 +120,10 @@ async def delete_molecule(identifier: str):
     - **identifier**: Unique identifier of the molecule.
     """
     if identifier not in molecules:
-        raise HTTPException(status_code=404, detail="Molecule not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Molecule not found."
+        )
     del molecules[identifier]
     return {"message": "Molecule deleted successfully."}
 
@@ -108,22 +133,38 @@ async def list_molecules():
     """
     List all molecules in the collection.
     """
-    return [{"identifier": identifier, "smiles": smiles} for identifier, smiles in molecules.items()]
+    return [
+        {"identifier": identifier, "smiles": smiles}
+        for identifier, smiles in molecules.items()
+    ]
 
 
-@app.post("/search/", summary="Substructure Search")
-async def search_substructure(substructure: str):
+@app.post("/search/", summary="Substructure Search", response_model=List[dict])
+async def search_substructure(query: SubstructureQuery):
     """
     Search for molecules containing a given substructure.
 
     - **substructure**: SMILES representation of the substructure.
     """
     try:
-        sub_mol = Chem.MolFromSmiles(substructure)
+
+        sub_mol = Chem.MolFromSmiles(query.substructure)
         if sub_mol is None:
-            raise HTTPException(status_code=400, detail="Invalid substructure SMILES string.")
-        matching_molecules = substructure_search(molecules.values(), substructure)
-        return [{"identifier": identifier, "smiles": smiles} for identifier, smiles in molecules.items()
-                if smiles in matching_molecules]
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid substructure SMILES string."
+            )
+
+        matching_molecules = substructure_search(
+            molecules.values(), query.substructure
+        )
+        return [
+            {"identifier": identifier, "smiles": smiles}
+            for identifier, smiles in molecules.items()
+            if smiles in matching_molecules
+        ]
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid substructure SMILES string."
+        )
