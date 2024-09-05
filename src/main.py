@@ -41,18 +41,28 @@ init_db()
 
 not_found = "Molecule not found."
 
-redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(
+    host='redis',
+    port=6379,
+    db=0,
+    decode_responses=True)
 
 
 @app.on_event("startup")
 async def startup_event():
     global redis_client
-    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+    redis_client = redis.Redis(
+        host='redis',
+        port=6379,
+        db=0,
+        decode_responses=True)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await redis_client.close()
+    global redis_client
+    if redis_client:
+        await redis_client.close()
 
 
 # Function to get cached result
