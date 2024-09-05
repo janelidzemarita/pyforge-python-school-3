@@ -7,6 +7,10 @@ services:
       - .:/app
     environment:
       SERVER_ID: SERVER-1
+      REDIS_HOST: redis   # Add Redis host
+      REDIS_PORT: 6379    # Add Redis port
+    depends_on:
+      - redis             # Ensure Redis starts before the web service
     networks:
       - webnet
 
@@ -16,6 +20,17 @@ services:
       - .:/app
     environment:
       SERVER_ID: SERVER-2
+      REDIS_HOST: redis   # Add Redis host
+      REDIS_PORT: 6379    # Add Redis port
+    depends_on:
+      - redis             # Ensure Redis starts before the web service
+    networks:
+      - webnet
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
     networks:
       - webnet
 
@@ -33,4 +48,3 @@ services:
 
 networks:
   webnet:
-

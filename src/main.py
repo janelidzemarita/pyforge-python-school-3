@@ -3,6 +3,7 @@ import logging
 from os import getenv
 from typing import List
 
+import redis.asyncio as redis
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from rdkit import Chem
@@ -27,7 +28,7 @@ class PrettyJSONResponse(JSONResponse):
 
 app = FastAPI(
     title="Molecule Management API",
-    version="2.1.0",
+    version="2.2.0",
     description="An API for managing molecules "
                 "and performing substructure searches "
                 "using RDKit and PostgreSQL.",
@@ -37,6 +38,44 @@ app = FastAPI(
 
 # Initialize the database
 init_db()
+
+not_found = "Molecule not found."
+
+redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
+
+
+@app.on_event("startup")
+async def startup_event():
+    global redis_client
+    redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await redis_client.close()
+
+
+# Function to get cached result
+async def get_cached_result(key: str) -> List[dict]:
+    try:
+        result = await redis_client.get(key)
+        if result:
+            # Decode JSON string back to list of dictionaries
+            return json.loads(result)
+        return []
+    except Exception as e:
+        logger.error(f"Error getting cache: {e}")
+        return []
+
+
+# Function to set cache
+async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
+    try:
+        # Convert list of dictionaries to JSON string
+        json_value = json.dumps(molecules)
+        await redis_client.setex(key, expiration, json_value)
+    except Exception as e:
+        logger.error(f"Error setting cache: {e}")
 
 
 # Dependency to get the database session
@@ -52,9 +91,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-not_found = "Molecule not found."
 
 
 @app.get("/", summary="Get Server ID")
@@ -265,6 +301,14 @@ async def search_substructure(
     """
     logger.info(f"Searching for substructure: {query.substructure}")
     try:
+        logger.info("Performing search in cache.")
+        # Check if result is in cache
+        cache_key = f"substructure:{query.substructure}"
+        cached_result = await get_cached_result(cache_key)
+        if cached_result:
+            return {"source": "cache", "data": cached_result}
+
+        logger.info("Cache miss. Performing search.")
         # Convert the substructure SMILES string to an RDKit molecule
         sub_mol = Chem.MolFromSmiles(query.substructure)
         if sub_mol is None:
@@ -278,9 +322,13 @@ async def search_substructure(
 
         # Perform the substructure search
         matching_molecules = [
-            mol for mol in all_molecules
+            {"identifier": mol.identifier, "smiles": mol.smiles}
+            for mol in all_molecules
             if Chem.MolFromSmiles(mol.smiles).HasSubstructMatch(sub_mol)
         ]
+
+        # Cache the search result
+        await set_cache(cache_key, matching_molecules)
 
         return matching_molecules
 
