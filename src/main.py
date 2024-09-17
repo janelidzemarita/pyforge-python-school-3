@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from database.database import init_db, SessionLocal
 from . import crud, schemas
 
+from contextlib import asynccontextmanager
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - '
@@ -41,28 +43,27 @@ init_db()
 
 not_found = "Molecule not found."
 
-redis_client = redis.Redis(
-    host='redis',
-    port=6379,
-    db=0,
-    decode_responses=True)
+# Initialize Redis client
+redis_client: redis.Redis
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global redis_client
+    # Startup event: Initialize Redis client
     redis_client = redis.Redis(
         host='redis',
         port=6379,
         db=0,
-        decode_responses=True)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    global redis_client
-    if redis_client:
-        await redis_client.close()
+        decode_responses=True
+    )
+    try:
+        # Yield control back to FastAPI to handle requests
+        yield
+    finally:
+        # Shutdown event: Close Redis connection
+        if redis_client:
+            await redis_client.close()
 
 
 # Function to get cached result
