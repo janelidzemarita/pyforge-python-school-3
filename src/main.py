@@ -1,13 +1,23 @@
+import json
+import logging
 from os import getenv
 from typing import List
 
-from rdkit import Chem
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import JSONResponse
-import json
+from rdkit import Chem
 from sqlalchemy.orm import Session
-from . import crud, schemas
+
 from database.database import init_db, SessionLocal
+from . import crud, schemas
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - '
+                           '%(name)s - '
+                           '%(levelname)s - '
+                           '%(message)s')
+logger = logging.getLogger(__name__)
 
 
 class PrettyJSONResponse(JSONResponse):
@@ -17,14 +27,13 @@ class PrettyJSONResponse(JSONResponse):
 
 app = FastAPI(
     title="Molecule Management API",
-    version="2.0.0",
+    version="2.1.0",
     description="An API for managing molecules "
                 "and performing substructure searches "
                 "using RDKit and PostgreSQL.",
     default_response_class=PrettyJSONResponse
 
 )
-
 
 # Initialize the database
 init_db()
@@ -56,6 +65,7 @@ def get_server():
     Returns:
         dict: A dictionary containing the server ID.
     """
+    logger.info("Server ID endpoint called.")
     return {"server_id": getenv("SERVER_ID", "1")}
 
 
@@ -80,10 +90,12 @@ async def add_molecule(
     Raises:
         HTTPException: If an error occurs while adding the molecule.
     """
+    logger.info(f"Adding molecule: {molecule.identifier}")
     try:
         db_molecule = crud.create_molecule(db, molecule)
         return db_molecule
     except Exception as e:
+        logger.error(f"Error adding molecule: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -108,12 +120,14 @@ async def get_molecule(
         HTTPException: If the molecule is not found
         or another error occurs.
     """
+    logger.info(f"Getting molecule with identifier: {identifier}")
     try:
         db_molecule = crud.get_molecule(db, identifier)
         if db_molecule is None:
             raise HTTPException(status_code=404, detail=not_found)
         return db_molecule
     except Exception as e:
+        logger.error(f"Error getting molecule: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -142,12 +156,14 @@ async def update_molecule(
         HTTPException: If the molecule is not found
         or another error occurs.
     """
+    logger.info(f"Updating molecule with identifier: {identifier}")
     try:
         db_molecule = crud.update_molecule(db, identifier, molecule)
         if db_molecule is None:
             raise HTTPException(status_code=404, detail=not_found)
         return db_molecule
     except Exception as e:
+        logger.error(f"Error updating molecule: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -166,19 +182,23 @@ async def delete_molecule(identifier: str, db: Session = Depends(get_db)):
     Raises:
         HTTPException: If the molecule is not found or another error occurs.
     """
+    logger.info(f"Deleting molecule with identifier: {identifier}")
     try:
         db_molecule = crud.delete_molecule(db, identifier)
         if db_molecule is None:
             raise HTTPException(status_code=404, detail=not_found)
         return {"message": "Molecule deleted successfully."}
     except Exception as e:
+        logger.error(f"Error deleting molecule: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/molecules/",
          summary="List all Molecules",
          response_model=List[schemas.MoleculeResponse])
-async def list_molecules(db: Session = Depends(get_db)):
+async def list_molecules(
+        limit: int = 100,
+        db: Session = Depends(get_db)):
     """
     List all molecules in the database.
 
@@ -191,10 +211,16 @@ async def list_molecules(db: Session = Depends(get_db)):
 
     Raises:
         HTTPException: If an error occurs while retrieving the molecules.
+        :param db:
+        :param limit:
     """
+    logger.info(f"Listing up to {limit} molecules.")
     try:
-        return crud.list_molecules(db)
+        # Convert iterator to list
+        molecules = list(crud.list_molecules(db, limit))
+        return molecules
     except Exception as e:
+        logger.error(f"Error listing molecules: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -206,6 +232,7 @@ def substructure_search(mols, mol):
     """
     # List to store molecules that contain the substructure (mol)
     molecule = Chem.MolFromSmiles(mol)
+    logger.info(f"Searching for substructure matches: {mol}")
     matching_molecules = [
         smiles for smiles in mols if
         Chem.MolFromSmiles(smiles).HasSubstructMatch(molecule)
@@ -236,6 +263,7 @@ async def search_substructure(
         HTTPException: If the substructure SMILES
         string is invalid or another error occurs.
     """
+    logger.info(f"Searching for substructure: {query.substructure}")
     try:
         # Convert the substructure SMILES string to an RDKit molecule
         sub_mol = Chem.MolFromSmiles(query.substructure)
@@ -246,7 +274,7 @@ async def search_substructure(
             )
 
         # Get all molecules from the database
-        all_molecules = crud.list_molecules(db)
+        all_molecules = crud.list_molecules(db, limit=500)
 
         # Perform the substructure search
         matching_molecules = [
@@ -257,6 +285,7 @@ async def search_substructure(
         return matching_molecules
 
     except Exception as e:
+        logger.error(f"Error searching for substructure: {e}")
         raise HTTPException(
             status_code=400,
             detail=str(e)

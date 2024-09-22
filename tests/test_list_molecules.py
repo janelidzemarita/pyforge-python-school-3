@@ -57,3 +57,15 @@ def test_list_molecules(setup_teardown):
     assert response.status_code == 200
     result = response.json()
     assert {"identifier": "ethanol", "smiles": "CCO"} in result
+
+
+def test_list_molecules_with_limit(setup_teardown):
+    response = client.get("/molecules/?limit=3")
+    assert response.status_code == 200
+    assert len(response.json()) == 3
+
+
+def test_list_molecules_without_limit(setup_teardown):
+    response = client.get("/molecules/")
+    assert response.status_code == 200
+    assert len(response.json()) == 6

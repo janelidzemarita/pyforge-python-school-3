@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from . import schemas
 from database import models
+from typing import Iterator
+from database.models import Molecule
 
 
 def create_molecule(db: Session, molecule: schemas.MoleculeCreate):
@@ -43,5 +45,35 @@ def delete_molecule(db: Session, identifier: str):
     return None
 
 
-def list_molecules(db: Session):
-    return db.query(models.Molecule).all()
+def list_molecules(db: Session, limit: int) -> Iterator[Molecule]:
+    """
+    List molecules from the database using an iterator.
+
+    Args:
+        db (Session): The database session.
+        limit (int): The maximum number of molecules to return.
+
+    Returns:
+        Iterator[Molecule]: An iterator that yields Molecule objects.
+    """
+    batch_size = 50
+    offset = 0
+    count = 0
+
+    while count < limit:
+        # Fetch the batch of molecules
+        batch = db.query(Molecule).offset(offset).limit(batch_size).all()
+        if not batch:
+            break
+
+        for molecule in batch:
+            if count >= limit:
+                return  # Stop yielding if limit is reached
+            yield molecule
+            count += 1
+
+        offset += batch_size
+
+        # If batch is smaller than batch_size, it means we've reached the end
+        if len(batch) < batch_size:
+            break
