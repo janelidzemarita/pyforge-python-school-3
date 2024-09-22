@@ -17,7 +17,7 @@ Molecule.metadata.create_all(bind=test_engine)
 client = TestClient(app)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def setup_teardown():
 
     client.post(
@@ -46,11 +46,14 @@ def setup_teardown():
     )
 
     yield
+
     # Teardown: Drop the database tables
     Base.metadata.drop_all(bind=test_engine)
 
 
-def test_get_server():
-    response = client.get("/")
+def test_list_molecules(setup_teardown):
+
+    response = client.get("/molecules/")
     assert response.status_code == 200
-    assert "server_id" in response.json()
+    result = response.json()
+    assert {"identifier": "ethanol", "smiles": "CCO"} in result

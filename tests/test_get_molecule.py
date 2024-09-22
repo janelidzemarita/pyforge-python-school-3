@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from src.main import app
 from database.database import Base
 from database.models import Molecule
@@ -13,11 +14,15 @@ test_engine = create_engine(DATABASE_URL)
 
 # Initialize the database
 Molecule.metadata.create_all(bind=test_engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    bind=test_engine)
+
 # Create a TestClient instance
 client = TestClient(app)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def setup_teardown():
 
     client.post(
@@ -44,13 +49,19 @@ def setup_teardown():
         "/molecule",
         json={"identifier": "aspirin", "smiles": "CC(=O)Oc1ccccc1C(=O)O"}
     )
-
     yield
+
     # Teardown: Drop the database tables
     Base.metadata.drop_all(bind=test_engine)
 
 
-def test_get_server():
-    response = client.get("/")
+def test_get_molecule(setup_teardown):
+    response = client.get("/molecule/benzene")
     assert response.status_code == 200
-    assert "server_id" in response.json()
+    assert response.json() == {
+        "identifier": "benzene",
+        "smiles": "c1ccccc1"}
+
+    # Test getting a non-existing molecule
+    response = client.get("/molecule/non_existing")
+    assert response.status_code == 400

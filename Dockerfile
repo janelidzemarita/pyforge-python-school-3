@@ -1,5 +1,5 @@
 # Use miniconda3 base image
-FROM continuumio/miniconda3
+FROM continuumio/miniconda3:4.9.2
 
 # Install RDKit from conda-forge
 RUN conda install -c conda-forge rdkit

@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from src.main import app
 from database.database import Base
 from database.models import Molecule
@@ -13,13 +14,17 @@ test_engine = create_engine(DATABASE_URL)
 
 # Initialize the database
 Molecule.metadata.create_all(bind=test_engine)
+TestingSessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=test_engine)
+
 # Create a TestClient instance
 client = TestClient(app)
 
 
 @pytest.fixture(scope="function")
 def setup_teardown():
-
     client.post(
         "/molecule",
         json={"identifier": "water", "smiles": "O"}
@@ -44,13 +49,21 @@ def setup_teardown():
         "/molecule",
         json={"identifier": "aspirin", "smiles": "CC(=O)Oc1ccccc1C(=O)O"}
     )
-
     yield
+
     # Teardown: Drop the database tables
     Base.metadata.drop_all(bind=test_engine)
 
 
-def test_get_server():
-    response = client.get("/")
+def test_delete_molecule(setup_teardown):
+    response = client.delete("/molecule/ethanol")
     assert response.status_code == 200
-    assert "server_id" in response.json()
+    assert response.json() == {"message": "Molecule deleted successfully."}
+
+    # Check the deletion
+    response = client.get("/molecule/ethanol")
+    assert response.status_code == 400
+
+
+# Run the tests with the following command:
+# pytest tests/test_delete_molecule.py
