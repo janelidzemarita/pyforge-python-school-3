@@ -44,19 +44,16 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client: redis.Redis
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global redis_client
-    # Startup event: Initialize Redis client
-    redis_client = redis.Redis(
+redis_client = redis.Redis(
         host='redis',
         port=6379,
         db=0,
         decode_responses=True
     )
+
+
+@asynccontextmanager
+async def lifespan():
     try:
         # Yield control back to FastAPI to handle requests
         yield
@@ -78,6 +75,7 @@ async def get_cached_result(key: str) -> List[dict]:
         logger.error(f"Error getting cache: {e}")
         return []
 
+
 # Function to set cache
 async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     try:
@@ -86,6 +84,7 @@ async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
         await redis_client.setex(key, expiration, json_value)
     except Exception as e:
         logger.error(f"Error setting cache: {e}")
+
 
 # Dependency to get the database session
 def get_db():
@@ -290,7 +289,7 @@ async def start_substructure_search(
         cached_result = await get_cached_result(query.substructure)
         if cached_result:
             logger.info(
-                f"Returning cached result for substructure: {query.substructure}"
+            f"Returning cached result for substructure: {query.substructure}"
             )
             return {"task_id": None,
                     "status": "Completed (from cache)",
