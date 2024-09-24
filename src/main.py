@@ -44,7 +44,7 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client = redis.Redis()
+redis_client = redis.Redis
 
 
 @asynccontextmanager
