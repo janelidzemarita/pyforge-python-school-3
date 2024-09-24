@@ -44,16 +44,19 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client = redis.Redis(
+redis_client = redis.Redis()
+
+
+@asynccontextmanager
+async def lifespan():
+    global redis_client
+    # Startup event: Initialize Redis client
+    redis_client = redis.Redis(
         host='redis',
         port=6379,
         db=0,
         decode_responses=True
     )
-
-
-@asynccontextmanager
-async def lifespan():
     try:
         # Yield control back to FastAPI to handle requests
         yield
