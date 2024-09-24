@@ -23,6 +23,12 @@ jobs:
           - 5432:5432
         options: --health-cmd="pg_isready" --health-timeout=30s --health-retries=3
 
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -41,7 +47,6 @@ jobs:
     - name: Create test database
       run: |
         psql postgresql://postgres:password@localhost:5432/postgres -c "CREATE DATABASE test_database;"
-  
 
     - name: Lint with flake8
       run: |
