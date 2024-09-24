@@ -14,7 +14,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create a Base class for model definitions
 Base = declarative_base()
-
 # Function to initialize the database (create tables)
 def init_db():
     try:

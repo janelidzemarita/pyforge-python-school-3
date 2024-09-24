@@ -78,7 +78,6 @@ async def get_cached_result(key: str) -> List[dict]:
         logger.error(f"Error getting cache: {e}")
         return []
 
-
 # Function to set cache
 async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     try:
@@ -271,7 +270,9 @@ async def list_molecules(
 
 
 @app.post("/search/", summary="Substructure Search")
-async def start_substructure_search(query: schemas.SubstructureQuery, db: Session = Depends(get_db)):
+async def start_substructure_search(
+        query: schemas.SubstructureQuery,
+        db: Session = Depends(get_db)):
     """
     Start a background substructure search task.
 
@@ -288,22 +289,33 @@ async def start_substructure_search(query: schemas.SubstructureQuery, db: Sessio
         # Check if the result is already cached
         cached_result = await get_cached_result(query.substructure)
         if cached_result:
-            logger.info(f"Returning cached result for substructure: {query.substructure}")
-            return {"task_id": None, "status": "Completed (from cache)", "result": cached_result}
+            logger.info(
+                f"Returning cached result for substructure: {query.substructure}"
+            )
+            return {"task_id": None,
+                    "status": "Completed (from cache)",
+                    "result": cached_result}
 
         # Convert the iterator to a list of SMILES strings
-        all_molecules = [molecule.smiles for molecule in crud.list_molecules(db, limit=500)]
+        all_molecules = [molecule.smiles
+                         for molecule
+                         in crud.list_molecules(db, limit=500)]
 
         # Start the background task
-        task = substructure_search_task.delay(query.substructure, all_molecules)
+        task = substructure_search_task.delay(
+            query.substructure,
+            all_molecules)
         return {"task_id": task.id, "status": task.status}
 
     except Exception as e:
         logger.error(f"Error starting substructure search: {e}")
-        raise HTTPException(status_code=500, detail="Failed to start substructure search.")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to start substructure search.")
 
 
-@app.get("/search/search-result/{task_id}", summary="Get Substructure Search Result")
+@app.get("/search/search-result/{task_id}",
+         summary="Get Substructure Search Result")
 async def get_task_result(task_id: str):
     """
     Retrieve the result of a substructure search task.
@@ -329,7 +341,9 @@ async def get_task_result(task_id: str):
             await set_cache(cache_key, result)
             logger.info(f"Cached result for substructure: {cache_key}")
 
-        return {"task_id": task_id, "status": "Task completed", "result": result}
+        return {"task_id": task_id,
+                "status": "Task completed",
+                "result": result}
 
     else:
         return {"task_id": task_id, "status": task_result.state}
