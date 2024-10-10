@@ -5,16 +5,16 @@ from typing import List
 
 import redis.asyncio as redis
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import JSONResponse
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from celery.result import AsyncResult
-from .tasks import substructure_search_task
-from .celery_worker import celery_app
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database.database import SessionLocal, init_db
 from . import crud, schemas
+from .tasks import substructure_search_task
+from .celery_worker import celery_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -44,7 +44,7 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client = redis.Redis
+redis_client: redis.Redis
 
 
 @asynccontextmanager
@@ -91,12 +91,6 @@ async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
 
 # Dependency to get the database session
 def get_db():
-    """
-    Provides a database session to the endpoints.
-
-    Yields:
-        db (Session): A SQLAlchemy session object.
-    """
     db = SessionLocal()
     try:
         yield db
@@ -299,9 +293,10 @@ async def start_substructure_search(
                     "result": cached_result}
 
         # Convert the iterator to a list of SMILES strings
-        all_molecules = [molecule.smiles
-                         for molecule
-                         in crud.list_molecules(db, limit=500)]
+        all_molecules = [
+            molecule.smiles for molecule
+            in crud.list_molecules(db, limit=500)
+        ]
 
         # Start the background task
         task = substructure_search_task.delay(
