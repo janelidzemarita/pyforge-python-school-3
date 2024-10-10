@@ -44,8 +44,10 @@ jobs:
         pip install -r requirements.txt
         pip install flake8 pytest
 
-    - name: Start Celery worker
+    - name: Set up database and start Celery worker
       run: |
+        # Create the test database
+        psql postgresql://postgres:password@localhost:5432/postgres -c "CREATE DATABASE test_database;"
         # Start the Celery worker in the background
         celery -A src.celery_worker.celery_app worker --loglevel=info &
         sleep 5  # Wait for the worker to start
