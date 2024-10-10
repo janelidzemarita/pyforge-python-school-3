@@ -4,17 +4,16 @@ from os import getenv
 from typing import List
 
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import JSONResponse
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from celery.result import AsyncResult
-from .tasks import substructure_search_task
-from .celery_worker import celery_app
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from database.database import SessionLocal, init_db
 from . import crud, schemas
-
+from .tasks import substructure_search_task
+from .celery_worker import celery_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -44,11 +43,11 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client = redis.Redis
+redis_client: redis.Redis = None
 
 
 @asynccontextmanager
-async def lifespan():
+async def lifespan(app: FastAPI):
     global redis_client
     # Startup event: Initialize Redis client
     redis_client = redis.Redis(
@@ -78,7 +77,6 @@ async def get_cached_result(key: str) -> List[dict]:
         logger.error(f"Error getting cache: {e}")
         return []
 
-
 # Function to set cache
 async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     try:
@@ -88,21 +86,13 @@ async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     except Exception as e:
         logger.error(f"Error setting cache: {e}")
 
-
 # Dependency to get the database session
 def get_db():
-    """
-    Provides a database session to the endpoints.
-
-    Yields:
-        db (Session): A SQLAlchemy session object.
-    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
 
 @app.get("/", summary="Get Server ID")
 def get_server():
