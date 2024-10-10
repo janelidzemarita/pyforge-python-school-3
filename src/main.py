@@ -3,6 +3,7 @@ import logging
 from os import getenv
 from typing import List
 
+import redis.asyncio as redis
 from fastapi import FastAPI, Depends, HTTPException
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
@@ -14,7 +15,6 @@ from sqlalchemy.orm import Session
 
 from database.database import SessionLocal, init_db
 from . import crud, schemas
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
