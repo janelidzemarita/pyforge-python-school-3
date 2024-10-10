@@ -13,7 +13,7 @@ class MoleculeResponse(MoleculeBase):
     identifier: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class SubstructureQuery(BaseModel):

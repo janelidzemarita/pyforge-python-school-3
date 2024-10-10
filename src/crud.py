@@ -6,7 +6,7 @@ from database.models import Molecule
 
 
 def create_molecule(db: Session, molecule: schemas.MoleculeCreate):
-    db_molecule = models.Molecule(**molecule.dict())
+    db_molecule = models.Molecule(**molecule.model_dump())
     db.add(db_molecule)
     db.commit()
     db.refresh(db_molecule)
@@ -15,7 +15,7 @@ def create_molecule(db: Session, molecule: schemas.MoleculeCreate):
 
 def get_molecule(db: Session, identifier: str):
     return db.query(models.Molecule)\
-        .filter(models.Molecule.identifier == identifier)\
+        .filter(identifier == models.Molecule.identifier)\
         .first()
 
 
@@ -24,7 +24,7 @@ def update_molecule(
         molecule: schemas.MoleculeCreate
 ):
     db_molecule = db.query(models.Molecule)\
-        .filter(models.Molecule.identifier == identifier)\
+        .filter(identifier == models.Molecule.identifier)\
         .first()
     if db_molecule:
         db_molecule.smiles = molecule.smiles
@@ -36,7 +36,7 @@ def update_molecule(
 
 def delete_molecule(db: Session, identifier: str):
     db_molecule = db.query(models.Molecule)\
-        .filter(models.Molecule.identifier == identifier)\
+        .filter(identifier == models.Molecule.identifier)\
         .first()
     if db_molecule:
         db.delete(db_molecule)
