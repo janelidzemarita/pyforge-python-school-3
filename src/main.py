@@ -3,6 +3,7 @@ import logging
 from os import getenv
 from typing import List
 
+import redis.asyncio as redis
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import JSONResponse
 import redis.asyncio as redis
