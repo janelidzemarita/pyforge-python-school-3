@@ -292,9 +292,10 @@ async def start_substructure_search(
                     "result": cached_result}
 
         # Convert the iterator to a list of SMILES strings
-        all_molecules = [molecule.smiles
-                         for molecule
-                         in crud.list_molecules(db, limit=500)]
+        all_molecules = [
+            molecule.smiles for molecule
+            in crud.list_molecules(db, limit=500)
+        ]
 
         # Start the background task
         task = substructure_search_task.delay(
