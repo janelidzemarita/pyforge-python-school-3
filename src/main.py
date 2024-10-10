@@ -43,11 +43,11 @@ init_db()
 not_found = "Molecule not found."
 
 # Initialize Redis client
-redis_client: redis.Redis = None
+redis_client: redis.Redis
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan():
     global redis_client
     # Startup event: Initialize Redis client
     redis_client = redis.Redis(
@@ -77,6 +77,7 @@ async def get_cached_result(key: str) -> List[dict]:
         logger.error(f"Error getting cache: {e}")
         return []
 
+
 # Function to set cache
 async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     try:
@@ -86,6 +87,7 @@ async def set_cache(key: str, molecules: List[dict], expiration: int = 60):
     except Exception as e:
         logger.error(f"Error setting cache: {e}")
 
+
 # Dependency to get the database session
 def get_db():
     db = SessionLocal()
@@ -93,6 +95,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 @app.get("/", summary="Get Server ID")
 def get_server():
